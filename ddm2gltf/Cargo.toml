@@ -5,4 +5,7 @@ authors.workspace = true
 edition.workspace = true
 
 [dependencies]
+gltf = { version = "1.2.0", features = [ "extras", "import", "names" ] }
+gltf-json = { version = "1.2.0", features = [ "names" ] }
+grim_gltf = { workspace = true }
 offbeat = { path = "../offbeat" }

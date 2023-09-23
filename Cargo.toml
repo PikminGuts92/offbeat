@@ -3,6 +3,7 @@ members = [
     "ddm2gltf",
     "offbeat"
 ]
+resolver = "2"
 
 [workspace.package]
 version = "0.1.0"
@@ -10,8 +11,9 @@ authors = ["PikminGuts92"]
 edition = "2021"
 
 [workspace.dependencies]
-clap = { version = "4.4.3", features = ["derive"] }
+clap = { version = "4.4.4", features = ["derive"] }
 grim = { path = "../grim/core/grim" }
+grim_gltf = { path = "../grim/core/grim_gltf" }
 log = "0.4.20"
 simplelog = "0.12.1"
 thiserror = "1.0.48"
