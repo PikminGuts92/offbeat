@@ -1,14 +1,14 @@
 use crate::ByteReader;
 use std::io::{Read, Seek};
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DdmFaceGroup {
     pub indicies: [u16; 30],
     pub triangle_start_idx: u32,
     pub triangle_count: u32,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DdmMesh {
     pub name: String,
     pub transform: [f32; 16],
@@ -17,14 +17,14 @@ pub struct DdmMesh {
     pub face_groups: Vec<DdmFaceGroup>,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DdmBone {
     pub name: String,
     pub transform: [f32; 16],
     pub id: u32
 }
 
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct DdmVertex {
     pub x: f32,
     pub y: f32,
@@ -44,7 +44,7 @@ pub struct DdmVertex {
     pub weight_3: f32,
 }
 
-#[derive(Default)]
+#[derive(Debug, Default)]
 pub struct DdmFile {
     pub meshes: Vec<DdmMesh>,
     pub bones: Vec<DdmBone>,
@@ -220,7 +220,19 @@ fn split_str<'a>(raw: &'a [u8]) -> (&'a str, &'a str) {
     let (s0, s1) = (first_size.unwrap(), second_size.unwrap());
 
     (
-        std::str::from_utf8(&raw[..(s0 + 1)]).unwrap(),
-        std::str::from_utf8(&raw[(s0 + 1)..((s0 + 1) + (s1 + 1))]).unwrap()
+        std::str::from_utf8(&raw[..s0]).unwrap(),
+        std::str::from_utf8(&raw[(s0 + 1)..((s0 + 1) + s1)]).unwrap()
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn split_str_test() {
+        let (str1, str2) = split_str(b"hello\0world\0");
+        assert_eq!("hello", str1);
+        assert_eq!("world", str2);
+    }
 }
