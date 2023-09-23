@@ -1,0 +1,8 @@
+[package]
+name = "ddm2gltf"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+
+[dependencies]
+offbeat = { path = "../offbeat" }
