@@ -117,7 +117,7 @@ fn convert_ddm_to_gltf(ddm_path: &Path, ddm: &DdmFile, output_dir_path: &Path) {
 
             let pos_idx = acc_builder.add_array(
                 format!("{}_pos", &mesh_name),
-                vertices.iter().map(|v| [v.x, v.y, v.z])
+                vertices.iter().map(|v| [-v.x, v.y, v.z])
             );
 
             let norm_idx = acc_builder.add_array(
