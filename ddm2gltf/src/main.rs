@@ -36,6 +36,11 @@ fn convert_ddm_to_gltf(ddm_path: &Path, ddm: &DdmFile, output_dir_path: &Path) {
     let ddm_dir = ddm_path.parent().unwrap();
     let mut acc_builder = AccessorBuilder::new();
 
+    let ddm_name = ddm_path
+        .file_stem()
+        .and_then(|f| f.to_str())
+        .unwrap();
+
     // Process textures
     let texture_names = ddm.meshes
         .iter()
@@ -77,8 +82,14 @@ fn convert_ddm_to_gltf(ddm_path: &Path, ddm: &DdmFile, output_dir_path: &Path) {
             ..Default::default()
         });
 
+        let is_single_part = mesh.face_groups.len() <= 1;
+
         for (i, face_group) in mesh.face_groups.iter().enumerate() {
-            let mesh_name = format!("{}.{}", &mesh.name, i);
+            let mesh_name = if is_single_part {
+                mesh.name.to_owned()
+            } else {
+                format!("{}.{}", &mesh.name, i)
+            };
 
             // 3 indicies = 1 triangle
             let index_start = face_group.triangle_start_idx as usize;
@@ -235,31 +246,59 @@ fn convert_ddm_to_gltf(ddm_path: &Path, ddm: &DdmFile, output_dir_path: &Path) {
                 extras: None
             })
             .collect(),
-        nodes: meshes
-            .iter()
-            .enumerate()
-            .map(|(i, _m)| json::Node {
+        nodes: {
+            let mut nodes = Vec::new();
+
+            // Root node
+            nodes.push(json::Node {
                 camera: None,
-                children: None,
+                children: Some((0..meshes.len())
+                    .into_iter()
+                    .map(|i| json::Index::new((i + 1) as u32))
+                    .collect()),
                 extensions: None,
                 extras: None,
                 matrix: None,
-                mesh: Some(json::Index::new(i as u32)),
-                name: None, //Some(dir_name.to_string()),
+                mesh: None,
+                name: Some(ddm_name.to_string()),
                 rotation: None,
                 scale: None,
                 translation: None,
                 skin: None,
                 weights: None,
-            })
-            .collect(),
+            });
+
+            // Mesh nodes
+            for i in 0..meshes.len() {
+                nodes.push(json::Node {
+                    camera: None,
+                    children: None,
+                    extensions: None,
+                    extras: None,
+                    matrix: None,
+                    mesh: Some(json::Index::new(i as u32)),
+                    name: None,
+                    rotation: None,
+                    scale: None,
+                    translation: None,
+                    skin: None,
+                    weights: None,
+                });
+            }
+
+            nodes
+        },
         scenes: vec![
             json::Scene {
                 name: None,
-                nodes: (0..meshes.len())
+                //name: Some(ddm_name.to_string()),
+                /*nodes: (0..meshes.len())
                     .into_iter()
                     .map(|i| json::Index::new(i as u32))
-                    .collect(),
+                    .collect(),*/
+                nodes: vec![
+                    json::Index::new(0)
+                ],
                 extensions: None,
                 extras: None,
             }
@@ -271,11 +310,10 @@ fn convert_ddm_to_gltf(ddm_path: &Path, ddm: &DdmFile, output_dir_path: &Path) {
     };
 
     // Write files
-    let basename = "ddm_model";
-    build_binary(basename, output_dir_path, &mut gltf, acc_builder);
+    build_binary(ddm_name, output_dir_path, &mut gltf, acc_builder);
 
     // Write gltf json
-    let gltf_filename = format!("{basename}.gltf");
+    let gltf_filename = format!("{ddm_name}.gltf");
     let gltf_path = output_dir_path.join(&gltf_filename);
     let writer = std::fs::File::create(&gltf_path).expect("I/O error");
     json::serialize::to_writer_pretty(writer, &gltf).expect("Serialization error");
