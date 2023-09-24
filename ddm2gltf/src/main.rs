@@ -8,8 +8,13 @@ use std::io::Write;
 use std::path::Path;
 
 fn main() {
-    // Input: [ddm_path] [gltf_dir_path]
+    // Input: [ddm_file_path] [gltf_dir_path]
     let args: Vec<_> = env::args().skip(1).collect();
+
+    if args.len() < 2 {
+        println!("ddm2gltf.exe [ddm_file_path] [gltf_dir_path]");
+        return;
+    }
 
     let ddm_file_path = Path::new(&args[0]);
     let mut ddm_file = File::open(ddm_file_path).unwrap();
