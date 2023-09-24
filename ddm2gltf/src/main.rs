@@ -19,16 +19,65 @@ fn main() {
 
     //println!("{ddm:#?}");
 
-    convert_ddm_to_gltf(&ddm, &gltf_output_dir_path);
+    convert_ddm_to_gltf(ddm_file_path, &ddm, &gltf_output_dir_path);
 }
 
-fn convert_ddm_to_gltf(ddm: &DdmFile, output_dir_path: &Path) {
+fn convert_image(dds_path: &Path, png_path: &Path) {
+    use image::{ImageFormat, open};
+
+    // Create dir
+    create_dir_if_not_exists(png_path.parent().unwrap()).unwrap();
+
+    let image = open(dds_path).unwrap();
+    image.save_with_format(png_path, ImageFormat::Png).unwrap();
+}
+
+fn convert_ddm_to_gltf(ddm_path: &Path, ddm: &DdmFile, output_dir_path: &Path) {
+    let ddm_dir = ddm_path.parent().unwrap();
     let mut acc_builder = AccessorBuilder::new();
-    let mut meshes = Vec::new();
+
+    // Process textures
+    let texture_names = ddm.meshes
+        .iter()
+        .map(|m| {
+            let tex_name = &m.tex_name;
+            let in_tex_path = ddm_dir.join(format!("{tex_name}.dds"));
+
+            let out_tex_filename = format!("{tex_name}.png");
+            let out_tex_path = output_dir_path.join(&out_tex_filename);
+
+            convert_image(&in_tex_path, &out_tex_path);
+            println!("Wrote \"{out_tex_filename}\"");
+
+            tex_name
+        })
+        .collect::<Vec<_>>();
 
     // Process meshes
-    for (i, mesh) in ddm.meshes.iter().enumerate() {
-        for face_group in mesh.face_groups.iter() {
+    let mut meshes = Vec::new();
+    let mut materials = Vec::new();
+    for (mesh_idx, mesh) in ddm.meshes.iter().enumerate() {
+        // Create material
+        let mat_index = materials.len() as u32;
+        materials.push(json::Material {
+            name: Some(mesh.name.to_owned()),
+            pbr_metallic_roughness: json::material::PbrMetallicRoughness {
+                base_color_texture: Some(json::texture::Info {
+                        index: json::Index::new(mesh_idx as u32),
+                        tex_coord: 0,
+                        extensions: None,
+                        extras: None
+                    }),
+                //base_color_factor:
+                ..Default::default()
+            },
+            emissive_factor: json::material::EmissiveFactor([0.0f32; 3]),
+            alpha_mode: json::validation::Checked::Valid(json::material::AlphaMode::Mask),
+            double_sided: true,
+            ..Default::default()
+        });
+
+        for (i, face_group) in mesh.face_groups.iter().enumerate() {
             let mesh_name = format!("{}.{}", &mesh.name, i);
 
             // 3 indicies = 1 triangle
@@ -135,10 +184,7 @@ fn convert_ddm_to_gltf(ddm: &DdmFile, output_dir_path: &Path) {
                         },
                         indices: face_idx
                             .map(|idx| json::Index::new(idx as u32)),
-                        /*material: mat_map
-                            .get(&mesh.mat)
-                            .map(|idx| json::Index::new(*idx as u32)),*/
-                        material: None,
+                        material: Some(json::Index::new(mat_index)),
                         mode: json::validation::Checked::Valid(gltf::mesh::Mode::Triangles),
                         targets: None,
                         extras: None,
@@ -152,18 +198,47 @@ fn convert_ddm_to_gltf(ddm: &DdmFile, output_dir_path: &Path) {
         }
     }
 
-    // TODO: Process textures
-
     // Create gltf json
     let mut gltf = json::Root {
         asset: json::Asset {
             generator: Some(format!("{} v{}", env!("CARGO_PKG_NAME"), env!("CARGO_PKG_VERSION"))),
             ..Default::default()
         },
+        samplers: vec![
+            json::texture::Sampler {
+                mag_filter: Some(json::validation::Checked::Valid(json::texture::MagFilter::Linear)),
+                min_filter: Some(json::validation::Checked::Valid(json::texture::MinFilter::Nearest)),
+                wrap_s: json::validation::Checked::Valid(json::texture::WrappingMode::Repeat),
+                wrap_t: json::validation::Checked::Valid(json::texture::WrappingMode::Repeat),
+                ..Default::default()
+            }
+        ],
+        images: texture_names
+            .iter()
+            .map(|tex_name| json::Image {
+                buffer_view: None,
+                mime_type: Some(json::image::MimeType(String::from("image/png"))),
+                name: Some(tex_name.to_string()),
+                uri: Some(format!("{tex_name}.png")),
+                extensions: None,
+                extras: None
+            })
+            .collect(),
+        textures: texture_names
+            .iter()
+            .enumerate()
+            .map(|(i, tex_name)| json::Texture {
+                name: Some(tex_name.to_string()),
+                sampler: Some(json::Index::new(0u32)),
+                source: json::Index::new(i as u32), // Image index
+                extensions: None,
+                extras: None
+            })
+            .collect(),
         nodes: meshes
             .iter()
             .enumerate()
-            .map(|(i, m)| json::Node {
+            .map(|(i, _m)| json::Node {
                 camera: None,
                 children: None,
                 extensions: None,
@@ -191,6 +266,7 @@ fn convert_ddm_to_gltf(ddm: &DdmFile, output_dir_path: &Path) {
         ],
         scene: Some(json::Index::new(0)),
         meshes,
+        materials,
         ..Default::default()
     };
 

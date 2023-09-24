@@ -8,4 +8,5 @@ edition.workspace = true
 gltf = { version = "1.2.0", features = [ "extras", "import", "names" ] }
 gltf-json = { version = "1.2.0", features = [ "names" ] }
 grim_gltf = { workspace = true }
+image = "0.24.7"
 offbeat = { path = "../offbeat" }
